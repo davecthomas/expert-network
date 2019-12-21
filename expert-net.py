@@ -2,6 +2,7 @@ import pandas as pd
 from google.cloud import bigquery
 import math
 
+# export GOOGLE_APPLICATION_CREDENTIALS=/Users/davidcthomas/expert-network-credentials.json'
 
 def query_stackoverflow():
     client = bigquery.Client()
