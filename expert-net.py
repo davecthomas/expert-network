@@ -5,7 +5,7 @@ import math
 # export GOOGLE_APPLICATION_CREDENTIALS=/Users/davidcthomas/expert-network-credentials.json'
 
 def query_stackoverflow():
-    client = bigquery.Client()
+    client = bigquery.Client(project='expert-network-262703')
 
     query_job = client.query("""
         SELECT
