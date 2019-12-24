@@ -2,8 +2,12 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="a023fe55-f86d-40e2-a8d5-4a7e42a3dad7" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/.flaskenv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/stackoverflow.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/expert-net.py" beforeDir="false" afterPath="$PROJECT_DIR$/expert-net.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/expert-net.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -96,6 +100,10 @@
       <screen x="0" y="0" width="1680" height="1050" />
     </state>
     <state x="304" y="187" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1680.1050@0.0.1680.1050" timestamp="1576966626095" />
+    <state x="559" y="335" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1577147485209">
+      <screen x="0" y="0" width="1680" height="1050" />
+    </state>
+    <state x="559" y="335" key="#com.intellij.fileTypes.FileTypeChooser/0.0.1680.1050@0.0.1680.1050" timestamp="1577147485209" />
     <state x="535" y="151" key="#goog" timestamp="1576542118157">
       <screen x="0" y="0" width="1680" height="1050" />
     </state>
@@ -137,5 +145,9 @@
       <screen x="0" y="0" width="1680" height="1050" />
     </state>
     <state x="421" y="120" width="837" height="810" key="find.popup/1680.0.1920.1200/0.0.1680.1050@0.0.1680.1050" timestamp="1576542058680" />
+    <state x="505" y="233" width="670" height="676" key="search.everywhere.popup" timestamp="1576967357355">
+      <screen x="0" y="0" width="1680" height="1050" />
+    </state>
+    <state x="505" y="233" width="670" height="676" key="search.everywhere.popup/0.0.1680.1050@0.0.1680.1050" timestamp="1576967357355" />
   </component>
 </project>
