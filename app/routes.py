@@ -1,6 +1,6 @@
 from app import app
 from app import stackoverflow
-from flask import render_template
+from flask import current_app, render_template
 
 so = stackoverflow.StackOverflow()
 
@@ -13,7 +13,8 @@ def index():
 
 @app.route('/sites')
 def sites():
-    return so.get_sites()
+    return_dict = so.get_sites()
+    return render_template('sites.html', return_dict=return_dict)
 
 
 @app.route('/comments')

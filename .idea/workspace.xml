@@ -2,8 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="a023fe55-f86d-40e2-a8d5-4a7e42a3dad7" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/templates/sites.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/routes.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/routes.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/stackoverflow.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/stackoverflow.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
@@ -144,9 +145,13 @@
       <screen x="0" y="0" width="1680" height="1050" />
     </state>
     <state x="421" y="120" width="837" height="810" key="find.popup/1680.0.1920.1200/0.0.1680.1050@0.0.1680.1050" timestamp="1576542058680" />
-    <state x="505" y="233" width="670" height="676" key="search.everywhere.popup" timestamp="1576967357355">
+    <state width="600" height="424" key="javadoc.popup" timestamp="1577231527136">
       <screen x="0" y="0" width="1680" height="1050" />
     </state>
-    <state x="505" y="233" width="670" height="676" key="search.everywhere.popup/0.0.1680.1050@0.0.1680.1050" timestamp="1576967357355" />
+    <state width="600" height="424" key="javadoc.popup/0.0.1680.1050@0.0.1680.1050" timestamp="1577231527136" />
+    <state x="505" y="233" width="670" height="676" key="search.everywhere.popup" timestamp="1577233316937">
+      <screen x="0" y="0" width="1680" height="1050" />
+    </state>
+    <state x="505" y="233" width="670" height="676" key="search.everywhere.popup/0.0.1680.1050@0.0.1680.1050" timestamp="1577233316937" />
   </component>
 </project>

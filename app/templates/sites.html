@@ -1,0 +1,51 @@
+{% extends "bootstrap/base.html" %}
+{% block title %}This is an example page{% endblock %}
+
+{% block navbar %}
+<div class="navbar navbar-fixed-top">
+  <!-- ... -->
+</div>
+{% endblock %}
+
+{% block content %}
+  <h1>Expert Network - Stack Exchange</h1>
+<div class="container-fluid">
+  <div class="row">
+  {% if return_dict is defined and "length" in return_dict%}
+    <div>Looking at {{return_dict["length"]}} StackExchange sites</div>
+    {% endif %}
+  </div>
+    {% if return_dict is defined and "items" in return_dict%}
+  <table class="table">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Site</th>
+    </tr>
+  </thead>
+  <tbody>
+      {% set inc=1 %}
+      {% for site in return_dict["items"] %}
+      <tr>
+      <th scope="row">{{loop.index}}</th>
+      <td><a href="{{site["link"]}}">{{site["name"]}}</a></td>
+      </tr>
+      {% endfor %}
+  </tbody>
+  </table>
+    {% endif %}
+<row>
+  <p>
+  <a class="btn btn-primary" data-toggle="collapse" href="#collapseExample" role="button" aria-expanded="false" aria-controls="collapseExample">
+    Raw
+  </a>
+</p>
+<div class="collapse" id="collapseExample">
+  <div class="card card-body">
+    {{return_dict}}
+  </div>
+</div>
+</row>
+
+</div>
+{% endblock %}

@@ -6,25 +6,31 @@ import json
 class StackOverflow:
     def __init__(self):
         """
-        Get properties and get connected
+        See app settings at https://stackapps.com/apps/oauth/view/16909
         """
+        self.so_client_id = 16909
+        self.so_api_key = "fBn0lLrgtPLjJeot2NKAbw(("
         self.dict_results = {}
         self.site = StackAPI('stackoverflow')
         self.s = requests.Session()
         self._so_headers = {}
+        self.so_params_dict = {"key": self.so_api_key, "pagesize": 100}
 
     def get_sites(self):
-        params_dict = {}
-        r = self.s.get("https://api.stackexchange.com/2.2/sites", params=params_dict, headers=self._so_headers)
+
+        r = self.s.get("https://api.stackexchange.com/2.2/sites", params=self.so_params_dict, headers=self._so_headers)
         if r.status_code != 200:
             return r.status_code
         else:
             r_json = r.json()
             item_list = r_json["items"]
             list_dict_sites = []
+            return_dict = {}
             for item in item_list:
                 list_dict_sites.append({"name": item["name"], "link": item["site_url"]})
-            return json.dumps(list_dict_sites)
+            return_dict["items"] = list_dict_sites
+            return_dict["length"] = len(list_dict_sites)
+            return return_dict
 
     def get_comments(self):
         self.comments = self.site.fetch('comments')
