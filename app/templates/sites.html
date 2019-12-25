@@ -1,5 +1,5 @@
 {% extends "bootstrap/base.html" %}
-{% block title %}This is an example page{% endblock %}
+{% block title %}Expert Network{% endblock %}
 
 {% block navbar %}
 <div class="navbar navbar-fixed-top">
@@ -8,31 +8,56 @@
 {% endblock %}
 
 {% block content %}
+  {% if "page" not in return_dict %}
+    {% set page = 1 %}
+  {% else %}
+    {% set page = return_dict["page"]%}
+  {% endif %}
+  {% if "pagesize" not in return_dict %}
+    {% set pagesize = 15 %}
+  {% else %}
+    {% set pagesize = return_dict["pagesize"]%}
+  {% endif %}
   <h1>Expert Network - Stack Exchange</h1>
 <div class="container-fluid">
-  <div class="row">
-  {% if return_dict is defined and "length" in return_dict%}
-    <div>Looking at {{return_dict["length"]}} StackExchange sites</div>
-    {% endif %}
-  </div>
     {% if return_dict is defined and "items" in return_dict%}
-  <table class="table">
+  <table class="table" table-striped>
   <thead>
-    <tr>
-      <th scope="col">#</th>
-      <th scope="col">Site</th>
+    <tr class="d-flex">
+      <th class="col-sm-1" scope="col">#</th>
+      <th class="col-sm-11" scope="col">Site</th>
     </tr>
   </thead>
   <tbody>
       {% set inc=1 %}
       {% for site in return_dict["items"] %}
-      <tr>
-      <th scope="row">{{loop.index}}</th>
-      <td><a href="{{site["link"]}}">{{site["name"]}}</a></td>
+      <tr class="d-flex">
+      <td class="col-sm-1" scope="row">{{loop.index + ((page-1)*pagesize)}}</td>
+      <td class="col-sm-11"><a href="{{site["link"]}}">{{site["name"]}}</a></td>
       </tr>
       {% endfor %}
   </tbody>
   </table>
+<row>
+    <nav aria-label="...">
+  <ul class="pagination">
+    <li class="page-item {% if page == 1 %} disabled{% endif %}"><a class="page-link" href="sites?page={{page-1}}&pagesize={{pagesize}}"><span class="page-link">Previous</span></a></li>
+    <li class="page-item active">
+      <span class="page-link">
+        <a class="page-link" href="sites?page={{page}}&pagesize={{pagesize}}">{{page}}</a>
+        <span class="sr-only">(current)</span>
+      </span>
+    </li>
+    {% if "has_more" in return_dict%}
+    <li class="page-item {% if return_dict["has_more"] == False %} disabled{% endif %}">
+      <span class="page-link">
+        <a class="page-link" href="sites?page={{page+1}}&pagesize={{pagesize}}">Next</a>
+      </span>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+</row>
     {% endif %}
 <row>
   <p>
@@ -46,6 +71,5 @@
   </div>
 </div>
 </row>
-
 </div>
 {% endblock %}

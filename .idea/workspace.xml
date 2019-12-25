@@ -2,11 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="a023fe55-f86d-40e2-a8d5-4a7e42a3dad7" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/app/templates/sites.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/routes.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/routes.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/stackoverflow.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/stackoverflow.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/templates/sites.html" beforeDir="false" afterPath="$PROJECT_DIR$/app/templates/sites.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />

@@ -2,6 +2,7 @@ from google.cloud import bigquery
 from stackapi import StackAPI
 import requests
 import json
+SO_DEFAULT_PAGESIZE = 15
 
 class StackOverflow:
     def __init__(self):
@@ -14,11 +15,17 @@ class StackOverflow:
         self.site = StackAPI('stackoverflow')
         self.s = requests.Session()
         self._so_headers = {}
-        self.so_params_dict = {"key": self.so_api_key, "pagesize": 100}
+        self.so_default_pagesize = SO_DEFAULT_PAGESIZE
+        self.so_params_dict = {"key": self.so_api_key, "pagesize": self.so_default_pagesize}
 
-    def get_sites(self):
+    def get_sites(self, page, pagesize=SO_DEFAULT_PAGESIZE):
+        so_params_dict = self.so_params_dict
+        if isinstance(page, int):
+            so_params_dict["page"] = page
+        if isinstance(pagesize, int):
+            so_params_dict["pagesize"] = pagesize
 
-        r = self.s.get("https://api.stackexchange.com/2.2/sites", params=self.so_params_dict, headers=self._so_headers)
+        r = self.s.get("https://api.stackexchange.com/2.2/sites", params=so_params_dict, headers=self._so_headers)
         if r.status_code != 200:
             return r.status_code
         else:
@@ -30,6 +37,13 @@ class StackOverflow:
                 list_dict_sites.append({"name": item["name"], "link": item["site_url"]})
             return_dict["items"] = list_dict_sites
             return_dict["length"] = len(list_dict_sites)
+            return_dict["page"] = page
+            return_dict["pagesize"] = pagesize
+            if "has_more" in r_json:
+                return_dict["has_more"] = r_json["has_more"]
+            else:
+                return_dict["has_more"] = r_json["has_more"]
+
             return return_dict
 
     def get_comments(self):
