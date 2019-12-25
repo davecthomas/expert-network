@@ -1,0 +1,16 @@
+{% extends "bootstrap/base.html" %}
+{% block title %}Expert Network Error{% endblock %}
+
+{% block navbar %}
+<div class="navbar navbar-fixed-top">
+  <!-- ... -->
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>Expert Network Error</h1>
+<div class="container-fluid">
+  <p>Error {{error}}</p>
+  <p>{{url}}</p>
+</div>
+{% endblock %}
