@@ -69,7 +69,8 @@
 </p>
 <div class="collapse" id="collapseExample">
   <div class="card card-body">
-    {{return_dict}}
+    {{return_dict["items"]|safe}}
+    {{return_dict["df_sites_top100_users_style"]|safe}}
   </div>
 </div>
 </row>
