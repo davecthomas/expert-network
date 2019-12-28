@@ -4,6 +4,7 @@ from urllib import parse
 import requests
 import json
 import pandas as pd
+from app import db
 
 SO_DEFAULT_PAGESIZE = int(15)
 
@@ -26,6 +27,9 @@ class StackOverflow:
         self.so_url_users_reputation = "users?order=desc&sort=reputation"
         self.so_filter_include_total = "!9Z(-x-Q)8"  # add &filter= to include a count of all results
         self.so_current_page_sites_dict = None
+        self.db = db.Firestore()
+        # self.db.testWrite()
+        # self.db.testRead()
 
     def get_sites(self, page, pagesize=SO_DEFAULT_PAGESIZE):
         so_params_dict = {}
@@ -49,17 +53,20 @@ class StackOverflow:
             for item in item_list:
                 # For each site in this page, get the top 100 users, by reputation, and calculate each person's reputation ratio
                 r2 = self.s.get(self.so_api_url + self.so_url_users_reputation,
-                                params={"key": self.so_api_key,"page": 1, "pagesize": 100, "site": item["api_site_parameter"]},
+                                params={"key": self.so_api_key, "page": 1, "pagesize": 100,
+                                        "site": item["api_site_parameter"]},
                                 headers=self._so_headers)
                 if r2.status_code != 200:
                     return {"error": r2.status_code,
-                            "url": {"method": self.so_api_url + self.so_url_users_reputation, "params": {"key": self.so_api_key,"page": 1, "pagesize": 100, "site": item["api_site_parameter"]}}}
+                            "url": {"method": self.so_api_url + self.so_url_users_reputation,
+                                    "params": {"key": self.so_api_key, "page": 1, "pagesize": 100,
+                                               "site": item["api_site_parameter"]}}}
                 else:
                     return_dict_top100_users = r2.json()
                     # return_dict_top100_users = self.get_top_users_reputation( item["api_site_parameter"], page=1, pagesize=100)
                     if "items" in return_dict_top100_users:
                         df_temp = pd.DataFrame(return_dict_top100_users["items"])
-                        df_list =["display_name", "reputation", "link", "user_id"]
+                        df_list = ["display_name", "reputation", "link", "user_id"]
                         df_temp = df_temp[df_list]
                         df_temp["site"] = item["api_site_parameter"]
                         top100_rep_sum = df_temp["reputation"].sum()
@@ -67,9 +74,10 @@ class StackOverflow:
                         df_sites_top100_users = df_sites_top100_users.append(df_temp)
                         print(df_sites_top100_users)
 
-                list_dict_sites.append(
-                    {"name": item["name"], "name_urlencoded": parse.quote(item["name"]),
-                     "site": item["api_site_parameter"], "link": item["site_url"]})
+                dict_site = {"name": item["name"], "name_urlencoded": parse.quote(item["name"]),
+                             "site": item["api_site_parameter"], "link": item["site_url"]}
+                list_dict_sites.append(dict_site)
+                db.Site(self.db.dbcoll_sites, dict_site).write()
 
             df_sites_top100_users = df_sites_top100_users.reset_index(drop=True)
 

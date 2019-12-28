@@ -12,7 +12,16 @@ Navigate to your project directory and install dependencies:
 cd YOUR_PROJECT
 pip3 install  -r requirements.txt
 ```
-Then launch by a command:
+### Prep for use of Google Cloud
+1. Create a Google Cloud Project and get the ID
+2. Create and download a service account credential from Google (https://cloud.google.com/firestore/docs/quickstart-servers)
+3. Set GCLOUD_PROJECT environment variable
+```
+export GOOGLE_APPLICATION_CREDENTIALS=/Users/<you>/expert-network-service-account.json
+export GCLOUD_PROJECT=expert-network-262703
+```
+## Run It
+Launch by a command:
 ```
 flask run
 ```
