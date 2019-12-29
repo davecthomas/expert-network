@@ -41,7 +41,7 @@ def sites():
 
     args = parser.parse_args()
 
-    return_dict = so.get_sites(get_page(args), get_pagesize(args))
+    return_dict = so.get_sites_by_page(get_page(args), get_pagesize(args))
     if "error" in return_dict:
         return render_template('error.html', error=return_dict["error"], url=return_dict["url"])
     else:
@@ -102,17 +102,17 @@ def users_rep():
     else:
         return render_template('top_rep.html', title="Top Experts", name=name, site=site, return_dict=return_dict)
 
+#
+# @app.route('/comments')
+# def comments():
+#     return so.get_comments()
 
-@app.route('/comments')
-def comments():
-    return so.get_comments()
-
-
-@app.route('/bigquery')
-def bigquery():
-    list_results = so.query_stackoverflow()
-    results_str = ""
-    for row in list_results:
-        result = "{} : {} views".format(row.url, row.view_count)
-        results_str = results_str + result
-    return results_str
+#
+# @app.route('/bigquery')
+# def bigquery():
+#     list_results = so.query_stackoverflow()
+#     results_str = ""
+#     for row in list_results:
+#         result = "{} : {} views".format(row.url, row.view_count)
+#         results_str = results_str + result
+#     return results_str

@@ -85,6 +85,10 @@ class StackOverflow:
     def admin_delete_sites(self):
         return self.firestore.batchDeleteSites()
 
+    def get_sites_by_page(self, page, pagesize):
+        return_dict = self.firestore.get_sites_by_page(page, pagesize)
+        return return_dict
+
     # Get a list of all SO sites and return a list of Site objects
     def get_sites(self, page, pagesize=SO_DEFAULT_PAGESIZE):
         so_params_dict = {}
@@ -133,9 +137,9 @@ class StackOverflow:
                 dict_site = {"name": item["name"], "name_urlencoded": parse.quote(item["name"]),
                              "site": item["api_site_parameter"], "link": item["site_url"]}
                 list_dict_sites.append(dict_site)
-                list_sites.append(db.Site(self.firestore.dbcoll_sites, dict_site))
-
-            self.firestore.batchStoreSites(list_sites)
+            #     list_sites.append(db.Site(self.firestore.dbcoll_sites, dict_site))
+            #
+            # self.firestore.batchStoreSites(list_sites)
 
             df_sites_top100_users = df_sites_top100_users.reset_index(drop=True)
 
@@ -143,16 +147,16 @@ class StackOverflow:
             #     {"reputation_ratio": "{:,.2%}"}).set_table_attributes(
             #     'class="table table-sm table-striped table-hover table-responsive"').render()
             # return_dict["df_sites_top100_users"] = df_sites_top100_users
-            return_dict["items"] = list_dict_sites
+            # return_dict["items"] = list_dict_sites
             return_dict["list_sites"] = list_sites
-            return_dict["length"] = len(list_dict_sites)
+            return_dict["length"] = len(list_sites)
             return_dict["page"] = int(page)
             return_dict["pagesize"] = int(pagesize)
             if "has_more" in r_json:
                 return_dict["has_more"] = r_json["has_more"]
             else:
                 return_dict["has_more"] = r_json["has_more"]
-            self.so_current_page_sites_dict = return_dict
+            # self.so_current_page_sites_dict = return_dict
             return return_dict
 
     def get_top_users_reputation(self, site, page, pagesize=SO_DEFAULT_PAGESIZE):

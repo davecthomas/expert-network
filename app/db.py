@@ -1,5 +1,6 @@
 from google.cloud import firestore
 from datetime import datetime
+import itertools as it
 
 GOOGLE_FIRESTORE_MAX_BATCH_SIZE = int(500)
 
@@ -11,24 +12,28 @@ class Firestore:
         self.db = firestore.Client(project='expert-network-262703')
         self.dbcoll_test = self.db.collection(u'test')
         self.dbcoll_sites = self.db.collection(u'sites')
+        self.all_sites_stream = self.dbcoll_sites.order_by(u'name').stream()
+        self.all_sites_list = list(self.all_sites_stream)
+        self.len_all_sites_list = len(self.all_sites_list)
 
-    def testWrite(self):
-        doc_ref = self.dbcoll_test.document(u'test1')
-
-        doc_ref.set({
-            u'datetime': datetime.now()
-        }, merge=True)
-
-    def testRead(self):
-        doc_ref = self.dbcoll_test.document(u'test1')
-
-        try:
-            doc = doc_ref.get()
-            print(u'Document data: {}'.format(doc.to_dict()))
-        except google.cloud.exceptions.NotFound:
-            print(u'No such document!')
+    # def testWrite(self):
+    #     doc_ref = self.dbcoll_test.document(u'test1')
+    #
+    #     doc_ref.set({
+    #         u'datetime': datetime.now()
+    #     }, merge=True)
+    #
+    # def testRead(self):
+    #     doc_ref = self.dbcoll_test.document(u'test1')
+    #
+    #     try:
+    #         doc = doc_ref.get()
+    #         print(u'Document data: {}'.format(doc.to_dict()))
+    #     except google.cloud.exceptions.NotFound:
+    #         print(u'No such document!')
 
     # Store a batch of up to 500 sites (limited by Google Cloud Batch transaction limits)
+    # This can be done repeatedly without concern, due to merge=True
     def batchStoreSites(self, list_sites):
         len_list = len(list_sites)
         count_stored = 0
@@ -47,17 +52,38 @@ class Firestore:
 
     # Delete all sites in collection and return number of sites deleted
     def batchDeleteSites(self):
-        sites = self.dbcoll_sites.stream()
         print("Deleting sites:")
         batch = self.db.batch()
         count_deleted = 0
-        for site in sites:
+        for site in self.all_sites_stream:
             # print(u'{} => {}'.format(site.id, site.to_dict()))
             batch.delete(self.dbcoll_sites.document(site.id))
             count_deleted = count_deleted + 1
         # Commit the delete
         batch.commit()
         return count_deleted
+
+    # Delete all sites in collection and return number of sites deleted
+    def get_sites_by_page(self, page, pagesize):
+        if page > 0:
+            page = page - 1
+        return_dict = {}
+        return_dict["page"] = int(page)
+        return_dict["pagesize"] = int(pagesize)
+        slice_list = it.islice(self.all_sites_list, page*pagesize, page*pagesize+pagesize)
+        return_dict["list_sites"] = list(slice_list)
+        return_dict["length"] = len(return_dict["list_sites"])
+
+        if page*pagesize+pagesize >= self.len_all_sites_list:
+            return_dict["has_more"] = False
+        else:
+            return_dict["has_more"] = True
+
+        print("page {page}, pagesize {pagesize}")
+        for site in slice_list:
+            print(u'{} => {}'.format(site.id, site.to_dict()))
+
+        return return_dict
 
 
 class Site:
