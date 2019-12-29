@@ -3,6 +3,7 @@ from app import stackoverflow
 from flask import current_app, render_template
 from flask_restful import reqparse
 from flask import jsonify
+import json
 
 so = stackoverflow.StackOverflow()
 parser = reqparse.RequestParser()
@@ -72,6 +73,28 @@ def admin_delete_sites():
             'message': 'OK',
             'count_deleted_sites': so.admin_delete_sites()
     }
+    resp = jsonify(message)
+    resp.status_code = 200
+
+    return resp
+
+
+@app.route('/admin/load_experts')
+def admin_load_experts():
+    dict_return = so.admin_load_experts()
+    if "error" in dict_return:
+        message = {
+            'status': json.dumps(dict_return)
+        }
+    else:
+        message = {
+                'status': 200,
+                'message': 'OK',
+                'count_loaded_experts': dict_return["num_loaded"]
+        }
+    # Debug
+    # for site in dict_return["list_sites"]:
+    #     print(site.site)
     resp = jsonify(message)
     resp.status_code = 200
 

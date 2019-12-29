@@ -1,6 +1,7 @@
 from google.cloud import firestore
 from datetime import datetime
 import itertools as it
+import json
 
 GOOGLE_FIRESTORE_MAX_BATCH_SIZE = int(500)
 
@@ -10,27 +11,18 @@ class Firestore:
         Requires Project ID, determined by the GCLOUD_PROJECT environment variable
         """
         self.db = firestore.Client(project='expert-network-262703')
-        self.dbcoll_test = self.db.collection(u'test')
         self.dbcoll_sites = self.db.collection(u'sites')
+        self.dbcoll_experts = self.db.collection(u'experts')
         self.all_sites_stream = self.dbcoll_sites.order_by(u'name').stream()
-        self.all_sites_list = list(self.all_sites_stream)
-        self.len_all_sites_list = len(self.all_sites_list)
+        fs_sites_list = list(self.all_sites_stream)
+        # Convert a list of Firestore objects to a list of Site objects
+        self.all_sites_list = []
+        for fs_site in fs_sites_list:
+            dict_site = fs_site.to_dict()
+            self.all_sites_list.append(Site(self.dbcoll_sites, fs_site.to_dict()))
 
-    # def testWrite(self):
-    #     doc_ref = self.dbcoll_test.document(u'test1')
-    #
-    #     doc_ref.set({
-    #         u'datetime': datetime.now()
-    #     }, merge=True)
-    #
-    # def testRead(self):
-    #     doc_ref = self.dbcoll_test.document(u'test1')
-    #
-    #     try:
-    #         doc = doc_ref.get()
-    #         print(u'Document data: {}'.format(doc.to_dict()))
-    #     except google.cloud.exceptions.NotFound:
-    #         print(u'No such document!')
+        self.len_all_sites_list = len(self.all_sites_list)
+        # print(f'{self.len_all_sites_list}: {self.all_sites_list}')
 
     # Store a batch of up to 500 sites (limited by Google Cloud Batch transaction limits)
     # This can be done repeatedly without concern, due to merge=True
@@ -79,11 +71,32 @@ class Firestore:
         else:
             return_dict["has_more"] = True
 
-        print("page {page}, pagesize {pagesize}")
-        for site in slice_list:
-            print(u'{} => {}'.format(site.id, site.to_dict()))
+        # print(f"page {page}, pagesize {pagesize}")
+        # for site in return_dict["list_sites"]:
+        #     dict_site = site.to_dict()
+        #     print(f'{site.name} => {dict_site}')
 
         return return_dict
+
+    # Store a batch of up to 500 experts (limited by Google Cloud Batch transaction limits)
+    # This can be done repeatedly without concern, due to merge=True
+    def batch_store_experts(self, list_experts):
+        len_list = len(list_experts)
+        count_stored = 0
+        if len_list > GOOGLE_FIRESTORE_MAX_BATCH_SIZE:
+            list_of_batches = [list_experts[i:i + GOOGLE_FIRESTORE_MAX_BATCH_SIZE] for i in range(0, len(list_experts), GOOGLE_FIRESTORE_MAX_BATCH_SIZE)]
+        else:
+            list_of_batches = [list_experts]
+
+        for batch_of_experts in list_of_batches:
+            # batch = self.db.batch()
+            for expert in batch_of_experts:
+                # print(f"{expert.to_dict()}")
+                # batch.set(self.dbcoll_experts.document(expert.user_id), expert.to_dict(), merge=True)
+                count_stored = count_stored + 1
+            # batch.commit()
+
+        return {"status": "OK", "count_stored": count_stored}
 
 
 class Site:
@@ -114,8 +127,56 @@ class Site:
         return self.dict_site
 
     def __repr__(self):
-        return self.dict_site
+        return json.dumps(self.dict_site)
 
+    # Non-batched write is currently unused
     def write(self):
         self.dict_site["timestamp"] = firestore.SERVER_TIMESTAMP
         self.dbcoll_sites.document(self.site).set(self.dict_site, merge=True)
+
+
+class Expert:
+    # {"user_id": item["user_id"], "display_name": item["display_name"]),
+    # "link": item["link"], "site": item["site"], "reputation": item["reputation"]}
+    def __init__(self, dbcoll_experts, dict_expert):
+        self.dict_expert = dict_expert
+        self.dbcoll_experts = dbcoll_experts
+
+        if "user_id" in dict_expert:
+            self.user_id = dict_expert["user_id"]
+        else:
+            self.user_id = None
+        if "display_name" in dict_expert:
+            self.display_name = dict_expert["display_name"]
+        else:
+            self.display_name = None
+        if "link" in dict_expert:
+            self.link = dict_expert["link"]
+        else:
+            self.link = None
+        if "site" in dict_expert:
+            self.site = dict_expert["site"]
+        else:
+            self.site = None
+
+        self.total_reputation = 0
+        self.site_reputation = {}
+        # Store a dictionary of {site_a: reputation_a, site_b: reputation_b}
+        # and a total_reputation (although this is unused currently)
+        if "site" in dict_expert:
+            if "reputation" in dict_expert:
+                self.site_reputation[dict_expert["site"]] = dict_expert["reputation"]
+                self.total_reputation = self.total_reputation + dict_expert["reputation"]
+            else:
+                self.site_reputation[dict_expert["site"]] = None
+
+    def to_dict(self):
+        return self.dict_expert
+
+    def __repr__(self):
+        return json.dumps(self.dict_expert)
+
+    # Non-batched write is currently unused
+    def write(self):
+        self.dict_expert["timestamp"] = firestore.SERVER_TIMESTAMP
+        self.dbcoll_sites.document(self.user_id).set(self.dict_expert, merge=True)

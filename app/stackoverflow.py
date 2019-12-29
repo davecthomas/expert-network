@@ -9,6 +9,8 @@ from app import db
 SO_DEFAULT_PAGESIZE = int(15)
 # This MAX is technically unbounded, but I want to page at this size due to batch limits in Google Cloud Firestore
 SO_MAX_PAGESIZE = int(500)
+SO_NUM_TOP_EXPERTS = int(
+    10)  # This should be 100, but I don't want to overrun my Google Firestore limit of 20K writes (and 50K reads) per day
 
 
 class StackOverflow:
@@ -30,6 +32,8 @@ class StackOverflow:
         self.so_filter_include_total = "!9Z(-x-Q)8"  # add &filter= to include a count of all results
         self.so_current_page_sites_dict = None
         self.firestore = db.Firestore()
+        self.all_sites_list = self.firestore.all_sites_list
+        self.timeout_longwait = (10, 600)  # Tuple of <to remote machine>, <response>
         # self.firestore.testWrite()
         # self.firestore.testRead()
 
@@ -87,6 +91,7 @@ class StackOverflow:
 
     def get_sites_by_page(self, page, pagesize):
         return_dict = self.firestore.get_sites_by_page(page, pagesize)
+        return_dict["page"] = return_dict["page"] + 1
         return return_dict
 
     # Get a list of all SO sites and return a list of Site objects
@@ -159,7 +164,46 @@ class StackOverflow:
             # self.so_current_page_sites_dict = return_dict
             return return_dict
 
-    def get_top_users_reputation(self, site, page, pagesize=SO_DEFAULT_PAGESIZE):
+    # Get a list of top SO experts, get top reputation per site, store these
+    # No paging needed, since we only get top 100 users
+    def admin_load_experts(self):
+        so_params_dict = {}
+        so_params_dict.update(self.so_params_dict)
+        page = so_params_dict["page"] = 1
+        pagesize = so_params_dict["pagesize"] = SO_NUM_TOP_EXPERTS
+        list_experts_returned = []
+        num_loaded = 0
+
+        for site in self.all_sites_list:
+            so_params_dict["site"] = site.site
+
+            r = self.s.get(self.so_api_url + self.so_url_users_reputation, params=so_params_dict,
+                           headers=self._so_headers)
+            if r.status_code != 200:
+                return {"error": r.status_code,
+                        "url": {"method": self.so_api_url + self.so_url_users_reputation, "params": so_params_dict}}
+            else:
+                return_dict = {}
+                r_json = r.json()
+                item_list = r_json["items"]
+                list_experts = []
+                for item in item_list:
+                    dict_expert = {"user_id": item["user_id"], "display_name": item["display_name"],
+                                   "link": item["link"], "site": site.site, "reputation": item["reputation"]}
+                    list_experts.append(db.Expert(self.firestore.dbcoll_experts, dict_expert))
+                    # "reputation_ratio": df_site_top100_users.loc[df_site_top100_users['name'] == item["display_name"], "reputation_ratio"].iloc[0]})
+
+                results_batch_store = self.firestore.batch_store_experts(list_experts)
+                if results_batch_store["status"] == "OK":
+                    list_experts_returned.extend(list_experts)
+                    # print(f"batch_store_experts stored: {results_batch_store['count_stored']}")
+                    num_loaded = len(list_experts) + num_loaded
+                else:
+                    print(f"batch_store_experts failed: {results_batch_store['attempted_count']}")
+
+        return {"num_loaded": num_loaded, "list_sites": list_experts_returned}
+
+    def get_top_users_reputation(self, site, page, pagesize=SO_NUM_TOP_EXPERTS):
         so_params_dict = {}
         so_params_dict.update(self.so_params_dict)
         if isinstance(page, int):
