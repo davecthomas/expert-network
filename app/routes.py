@@ -2,6 +2,7 @@ from app import app
 from app import stackoverflow
 from flask import current_app, render_template
 from flask_restful import reqparse
+from flask import jsonify
 
 so = stackoverflow.StackOverflow()
 parser = reqparse.RequestParser()
@@ -45,6 +46,36 @@ def sites():
         return render_template('error.html', error=return_dict["error"], url=return_dict["url"])
     else:
         return render_template('sites.html', title="Top Sites", return_dict=return_dict)
+
+
+@app.route('/admin/load_sites')
+def admin_load_sites():
+    dict_return = so.admin_load_sites(page=1)
+    message = {
+            'status': 200,
+            'message': 'OK',
+            'count_loaded_sites': dict_return["num_loaded"]
+    }
+    # Debug
+    # for site in dict_return["list_sites"]:
+    #     print(site.site)
+    resp = jsonify(message)
+    resp.status_code = 200
+
+    return resp
+
+
+@app.route('/admin/delete_sites')
+def admin_delete_sites():
+    message = {
+            'status': 200,
+            'message': 'OK',
+            'count_deleted_sites': so.admin_delete_sites()
+    }
+    resp = jsonify(message)
+    resp.status_code = 200
+
+    return resp
 
 
 @app.route('/users_rep')

@@ -31,11 +31,11 @@
   </thead>
   <tbody>
       {% set inc=1 %}
-      {% for site in return_dict["items"] %}
+      {% for site in return_dict["list_sites"] %}
       <tr class="d-flex">
       <td class="col-sm-1" scope="row">{{loop.index + ((page-1)*pagesize)}}</td>
-      <td class="col-sm-4"><a href="{{site["link"]}}">{{site["name"]|safe}}</a></td>
-      <td class="col-sm-7"><a href="users_rep?site={{site["site"]}}&name={{site["name_urlencoded"]}}">{{site["name"]|safe}}</a></td>
+      <td class="col-sm-4"><a href="{{site.link}}">{{site.name|safe}}</a></td>
+      <td class="col-sm-7"><a href="users_rep?site={{site.site}}&name={{site.name_urlencoded}}">{{site.name|safe}}</a></td>
       </tr>
       {% endfor %}
   </tbody>
