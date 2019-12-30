@@ -13,7 +13,7 @@ SO_DEFAULT_PAGESIZE = int(15)
 # This MAX is technically unbounded, but I want to page at this size due to batch limits in Google Cloud Firestore
 SO_MAX_PAGESIZE = int(500)  # There are currently < 400 sites in SO, so this feature isn't relevant, yet.
 # This should be 100, but I don't want to overrun my Google Firestore limit of 20K writes (and 50K reads) per day
-SO_NUM_TOP_EXPERTS = int(10)
+SO_NUM_TOP_EXPERTS = int(25)
 SO_503_INTER_REQUEST_BACKOFF_SLEEP_SECONDS = 300
 
 
@@ -40,8 +40,6 @@ class StackOverflow:
         self.all_sites_list = self.firestore.all_sites_list
         self.len_all_sites_list = len(self.firestore.all_sites_list)
         self.timeout_longwait = (10, 600)  # Tuple of <to remote machine>, <response>
-        # self.firestore.testWrite()
-        # self.firestore.testRead()
 
     # Get a list of all SO sites, store them in batches of SO_MAX_PAGESIZE,
     # and return a full list of all SO Site objects.
@@ -122,43 +120,9 @@ class StackOverflow:
             return_dict = {}
             first = True
             for item in item_list:
-                # # For each site in this page, get the top 100 users, by reputation, and calculate each person's reputation ratio
-                # r2 = self.s.get(self.so_api_url + self.so_url_users_reputation,
-                #                 params={"key": self.so_api_key, "page": 1, "pagesize": 100,
-                #                         "site": item["api_site_parameter"]},
-                #                 headers=self._so_headers)
-                # if r2.status_code != 200:
-                #     return {"error": r2.status_code,
-                #             "url": {"method": self.so_api_url + self.so_url_users_reputation,
-                #                     "params": {"key": self.so_api_key, "page": 1, "pagesize": 100,
-                #                                "site": item["api_site_parameter"]}}}
-                # else:
-                #     return_dict_top100_users = r2.json()
-                #     # return_dict_top100_users = self.get_top_users_reputation( item["api_site_parameter"], page=1, pagesize=100)
-                #     if "items" in return_dict_top100_users:
-                #         df_temp = pd.DataFrame(return_dict_top100_users["items"])
-                #         df_list = ["display_name", "reputation", "link", "user_id"]
-                #         df_temp = df_temp[df_list]
-                #         df_temp["site"] = item["api_site_parameter"]
-                #         top100_rep_sum = df_temp["reputation"].sum()
-                #         df_temp["reputation_ratio"] = df_temp["reputation"] / top100_rep_sum
-                #         df_sites_top100_users = df_sites_top100_users.append(df_temp)
-                #         print(df_sites_top100_users)
-
                 dict_site = {"name": item["name"], "name_urlencoded": parse.quote(item["name"]),
                              "site": item["api_site_parameter"], "link": item["site_url"]}
                 list_dict_sites.append(dict_site)
-            #     list_sites.append(db.Site(self.firestore.dbcoll_sites, dict_site))
-            #
-            # self.firestore.batchStoreSites(list_sites)
-
-            df_sites_top100_users = df_sites_top100_users.reset_index(drop=True)
-
-            # return_dict["df_sites_top100_users_style"] = df_sites_top100_users.style.format(
-            #     {"reputation_ratio": "{:,.2%}"}).set_table_attributes(
-            #     'class="table table-sm table-striped table-hover table-responsive"').render()
-            # return_dict["df_sites_top100_users"] = df_sites_top100_users
-            # return_dict["items"] = list_dict_sites
             return_dict["list_sites"] = list_sites
             return_dict["length"] = len(list_sites)
             return_dict["page"] = int(page)
@@ -167,7 +131,6 @@ class StackOverflow:
                 return_dict["has_more"] = r_json["has_more"]
             else:
                 return_dict["has_more"] = r_json["has_more"]
-            # self.so_current_page_sites_dict = return_dict
             return return_dict
 
     # Get a list of top SO experts, get top reputation per site, store these
@@ -177,7 +140,7 @@ class StackOverflow:
         so_params_dict.update(self.so_params_dict)
         page = so_params_dict["page"] = 1
         pagesize = so_params_dict["pagesize"] = SO_NUM_TOP_EXPERTS
-        list_experts_returned = []
+        dict_experts_returned = {}
         num_imported = 0
 
         print(f"admin_import_experts num sites: {self.len_all_sites_list}")
@@ -206,18 +169,21 @@ class StackOverflow:
                     # Continue (log but ignore this failed http get from SO)
                     continue
                 else:
-                    list_experts = self.import_experts_for_site(site, r.json())
+                    dict_experts = self.import_experts_for_site(site, r.json())
             else:
-                list_experts = self.import_experts_for_site(site, r.json())
+                dict_experts = self.import_experts_for_site(site, r.json())
 
-            list_experts_returned.extend(list_experts)
-            num_imported = num_imported + len(list_experts)
+            dict_experts_returned = self.merge_experts(dict_experts, dict_experts_returned)
+
+            num_imported = num_imported + len(dict_experts)
             print(f"{num_imported} experts imported...")
 
             # Sleep to back off hammering SO
             self.check_for_backoff(r)
 
-        return {"num_imported": num_imported, "list_experts_returned": list_experts_returned}
+        # Curious: get the expert with the most sites
+
+        return {"num_imported": num_imported, "dict_experts_returned": dict_experts_returned}
 
     @staticmethod
     def check_for_backoff(r):
@@ -236,59 +202,45 @@ class StackOverflow:
     def import_experts_for_site(self, site, r_json):
         return_dict = {}
         item_list = r_json["items"]
-        list_experts = []
-        for item in item_list:
-            dict_expert = {"user_id": item["user_id"], "display_name": item["display_name"],
-                           "link": item["link"], "site": site.site, "reputation": item["reputation"]}
-            list_experts.append(db.Expert(self.firestore.dbcoll_experts, dict_expert))
+        dict_experts = {}
+        df_list = pd.DataFrame(item_list)
+        df_list_columns = ["display_name", "reputation", "link", "user_id"]
+        df_list = df_list[df_list_columns]
+        df_list["site"] = site.site
+        all_rep_sum = df_list["reputation"].sum()
+        df_list["reputation_ratio"] = df_list["reputation"] / all_rep_sum
+        df_list['reputation_ratio'] = df_list['reputation_ratio'].astype(float).map("{:.2%}".format)
+        # df_item_list = df_list.to_dict(orient='records')
+        for i, dict_expert in df_list.iterrows():
+            expert = db.Expert(self.firestore.dbcoll_experts, dict_expert)
+            dict_experts[expert.user_id] = expert
 
-        results_batch_store = self.firestore.batch_store_experts(list_experts)
+        results_batch_store = self.firestore.batch_store_experts(dict_experts)
         if results_batch_store["status"] != "OK":
             print(f"num_imported failed: {results_batch_store['attempted_count']}")
+        # else:
+        #     print(df_list)
+        return dict_experts
 
-        return list_experts
+    # If the expert in the first dict is found in the second dict, update the expert
+    # Merge the first dict into the second, after you delete any duplicates
+    def merge_experts(self, dict_experts, dict_experts_returned):
+        list_keys_to_delete = []
+        for user_id, expert in dict_experts.items():
+            if user_id in dict_experts_returned:
+                site_to_add = next(iter(expert.sites))
+                expert_master = dict_experts_returned[user_id]
+                # print(f'Found same user {user_id} from site {site_to_add} in site {expert_master.sites}')
+                # This should add another site record to their reputation, total reputation increments
+                expert_master.add_site(expert, site_to_add)
+                # print(f"After merge: {expert_master}")
+                list_keys_to_delete.append(user_id)
 
-    def get_top_users_reputation(self, site, page, pagesize=SO_NUM_TOP_EXPERTS):
-        so_params_dict = {}
-        so_params_dict.update(self.so_params_dict)
-        if isinstance(page, int):
-            so_params_dict["page"] = page
-        if isinstance(pagesize, int):
-            so_params_dict["pagesize"] = pagesize
+        for key in list_keys_to_delete:
+            del dict_experts[key]
 
-        so_params_dict["site"] = site
-
-        r = self.s.get(self.so_api_url + self.so_url_users_reputation, params=so_params_dict, headers=self._so_headers)
-        if r.status_code != 200:
-            return {"error": r.status_code,
-                    "url": {"method": self.so_api_url + self.so_url_users_reputation, "params": so_params_dict}}
-        else:
-            return_dict = {}
-            df_site_top100_users = None
-            if self.so_current_page_sites_dict is not None:
-                df = self.so_current_page_sites_dict["df_sites_top100_users"]
-                df_site_top100_users = df.loc[df["site"] == site]
-                return_dict["df_site_top100_users"] = df_site_top100_users
-                # print(self.so_current_page_sites_dict)
-                # print(return_dict["df_site_top100_users"])
-
-            r_json = r.json()
-            item_list = r_json["items"]
-            list_dict_users = []
-            for item in item_list[:pagesize]:
-                list_dict_users.append(
-                    {"name": item["display_name"], "link": item["link"], "reputation": item["reputation"]})
-                # "reputation_ratio": df_site_top100_users.loc[df_site_top100_users['name'] == item["display_name"], "reputation_ratio"].iloc[0]})
-            return_dict["items"] = list_dict_users
-            return_dict["length"] = len(list_dict_users)
-            return_dict["page"] = page
-            return_dict["pagesize"] = pagesize
-            if "has_more" in r_json:
-                return_dict["has_more"] = r_json["has_more"]
-            else:
-                return_dict["has_more"] = r_json["has_more"]
-
-            return return_dict
+        dict_experts_returned.update(dict_experts)
+        return dict_experts_returned
 
     # def get_comments(self):
     #     return self.site.fetch('comments')

@@ -5,6 +5,7 @@ import json
 
 GOOGLE_FIRESTORE_MAX_BATCH_SIZE = int(500)
 
+
 class Firestore:
     def __init__(self):
         """
@@ -61,11 +62,11 @@ class Firestore:
         return_dict = {}
         return_dict["page"] = int(page)
         return_dict["pagesize"] = int(pagesize)
-        slice_list = it.islice(self.all_sites_list, page*pagesize, page*pagesize+pagesize)
+        slice_list = it.islice(self.all_sites_list, page * pagesize, page * pagesize + pagesize)
         return_dict["list_sites"] = list(slice_list)
         return_dict["length"] = len(return_dict["list_sites"])
 
-        if page*pagesize+pagesize >= self.len_all_sites_list:
+        if page * pagesize + pagesize >= self.len_all_sites_list:
             return_dict["has_more"] = False
         else:
             return_dict["has_more"] = True
@@ -79,7 +80,8 @@ class Firestore:
         len_list = len(list_experts)
         count_stored = 0
         if len_list > GOOGLE_FIRESTORE_MAX_BATCH_SIZE:
-            list_of_batches = [list_experts[i:i + GOOGLE_FIRESTORE_MAX_BATCH_SIZE] for i in range(0, len(list_experts), GOOGLE_FIRESTORE_MAX_BATCH_SIZE)]
+            list_of_batches = [list_experts[i:i + GOOGLE_FIRESTORE_MAX_BATCH_SIZE] for i in
+                               range(0, len(list_experts), GOOGLE_FIRESTORE_MAX_BATCH_SIZE)]
         else:
             list_of_batches = [list_experts]
 
@@ -132,10 +134,13 @@ class Site:
 
 class Expert:
     # {"user_id": item["user_id"], "display_name": item["display_name"]),
-    # "link": item["link"], "site": item["site"], "reputation": item["reputation"]}
+    # "link": item["link"], "sites": {site: "reputation": rep, "reputation_ratio": ratio},
+    # "total_reputation": total }
     def __init__(self, dbcoll_experts, dict_expert):
         self.dict_expert = dict_expert
         self.dbcoll_experts = dbcoll_experts
+        self.sites = {}
+        self.total_reputation = 0
 
         if "user_id" in dict_expert:
             self.user_id = dict_expert["user_id"]
@@ -150,26 +155,30 @@ class Expert:
         else:
             self.link = None
         if "site" in dict_expert:
-            self.site = dict_expert["site"]
-        else:
-            self.site = None
-
-        self.total_reputation = 0
-        self.site_reputation = {}
-        # Store a dictionary of {site_a: reputation_a, site_b: reputation_b}
-        # and a total_reputation (although this is unused currently)
-        if "site" in dict_expert:
+            site_key = dict_expert["site"]
+            self.sites[site_key] = {"site": site_key, "reputation": None, "reputation_ratio": None}
             if "reputation" in dict_expert:
-                self.site_reputation[dict_expert["site"]] = dict_expert["reputation"]
+                self.sites[site_key]["reputation"] = dict_expert["reputation"]
                 self.total_reputation = self.total_reputation + dict_expert["reputation"]
-            else:
-                self.site_reputation[dict_expert["site"]] = None
+
+            if "reputation_ratio" in dict_expert:
+                self.sites[site_key]["reputation_ratio"] = dict_expert["reputation_ratio"]
+
+    def add_site(self, expert, site):
+        site_key = site
+        expert_sites_dict = expert.sites[site_key]
+        self.sites[site_key] = {"site": site_key, "reputation": expert_sites_dict["reputation"],
+                                "reputation_ratio": expert_sites_dict["reputation_ratio"]}
+        print(
+            f'Incrementing {self.display_name} reputation from {self.total_reputation} to {self.total_reputation + expert_sites_dict["reputation"]}')
+        self.total_reputation = self.total_reputation + expert_sites_dict["reputation"]
 
     def to_dict(self):
-        return self.dict_expert
+        return self.__repr__()
 
     def __repr__(self):
-        return json.dumps(self.dict_expert)
+        return json.dumps({"user_id": self.user_id, "display_name": self.display_name, "link": self.link,
+                           "total_reputation": self.total_reputation, "sites": self.sites})
 
     # Non-batched write is currently unused
     def write(self):
