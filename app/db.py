@@ -22,7 +22,6 @@ class Firestore:
             self.all_sites_list.append(Site(self.dbcoll_sites, fs_site.to_dict()))
 
         self.len_all_sites_list = len(self.all_sites_list)
-        # print(f'{self.len_all_sites_list}: {self.all_sites_list}')
 
     # Store a batch of up to 500 sites (limited by Google Cloud Batch transaction limits)
     # This can be done repeatedly without concern, due to merge=True
@@ -71,16 +70,12 @@ class Firestore:
         else:
             return_dict["has_more"] = True
 
-        # print(f"page {page}, pagesize {pagesize}")
-        # for site in return_dict["list_sites"]:
-        #     dict_site = site.to_dict()
-        #     print(f'{site.name} => {dict_site}')
-
         return return_dict
 
     # Store a batch of up to 500 experts (limited by Google Cloud Batch transaction limits)
     # This can be done repeatedly without concern, due to merge=True
-    def batch_store_experts(self, list_experts):
+    @staticmethod
+    def batch_store_experts(list_experts):
         len_list = len(list_experts)
         count_stored = 0
         if len_list > GOOGLE_FIRESTORE_MAX_BATCH_SIZE:

@@ -4,13 +4,17 @@ from urllib import parse
 import requests
 import json
 import pandas as pd
+from requests.adapters import HTTPAdapter
+
 from app import db
+import time
 
 SO_DEFAULT_PAGESIZE = int(15)
 # This MAX is technically unbounded, but I want to page at this size due to batch limits in Google Cloud Firestore
-SO_MAX_PAGESIZE = int(500)
-SO_NUM_TOP_EXPERTS = int(
-    10)  # This should be 100, but I don't want to overrun my Google Firestore limit of 20K writes (and 50K reads) per day
+SO_MAX_PAGESIZE = int(500)  # There are currently < 400 sites in SO, so this feature isn't relevant, yet.
+# This should be 100, but I don't want to overrun my Google Firestore limit of 20K writes (and 50K reads) per day
+SO_NUM_TOP_EXPERTS = int(10)
+SO_503_INTER_REQUEST_BACKOFF_SLEEP_SECONDS = 300
 
 
 class StackOverflow:
@@ -27,12 +31,14 @@ class StackOverflow:
         self.so_default_pagesize = SO_DEFAULT_PAGESIZE
         self.so_params_dict = {"key": self.so_api_key, "pagesize": self.so_default_pagesize}
         self.so_api_url = "https://api.stackexchange.com/2.2/"
+        self.s.mount(self.so_api_url, HTTPAdapter(max_retries=3))
         self.so_url_sites = "sites"
         self.so_url_users_reputation = "users?order=desc&sort=reputation"
         self.so_filter_include_total = "!9Z(-x-Q)8"  # add &filter= to include a count of all results
         self.so_current_page_sites_dict = None
         self.firestore = db.Firestore()
         self.all_sites_list = self.firestore.all_sites_list
+        self.len_all_sites_list = len(self.firestore.all_sites_list)
         self.timeout_longwait = (10, 600)  # Tuple of <to remote machine>, <response>
         # self.firestore.testWrite()
         # self.firestore.testRead()
@@ -40,14 +46,14 @@ class StackOverflow:
     # Get a list of all SO sites, store them in batches of SO_MAX_PAGESIZE,
     # and return a full list of all SO Site objects.
     # Limit is SO_MAX_PAGESIZE per HTTP request; loop until no more "has_more"
-    def admin_load_sites(self, page):
+    def admin_import_sites(self, page):
         so_params_dict = {}
         so_params_dict.update(self.so_params_dict)
         if not isinstance(page, int):
             page = 1
         so_params_dict["pagesize"] = SO_MAX_PAGESIZE
         has_more = True
-        num_loaded = 0
+        num_imported = 0
         list_sites_returned = []  # list of Site objects that we return
 
         while has_more is True:
@@ -56,7 +62,7 @@ class StackOverflow:
             if r.status_code != 200:
                 return {"error": r.status_code,
                         "url": {"method": self.so_api_url + self.so_url_sites, "params": so_params_dict},
-                        "num_loaded": num_loaded}
+                        "num_imported": num_imported}
             else:
                 # Each of these is reused per iteration
                 r_json = r.json()
@@ -73,7 +79,7 @@ class StackOverflow:
                 if results_batch_store["status"] == "OK":
                     list_sites_returned.extend(list_sites)
                     print("batchStoreSites stored: {results_batch_store['count_stored']}")
-                    num_loaded = len(list_sites) + num_loaded
+                    num_imported = len(list_sites) + num_imported
                 else:
                     print("batchStoreSites failed: {results_batch_store['attempted_count']}")
 
@@ -83,7 +89,7 @@ class StackOverflow:
                     has_more = False
                 page = page + 1
 
-            return {"num_loaded": num_loaded, "list_sites": list_sites_returned}
+            return {"num_imported": num_imported, "list_sites": list_sites_returned}
 
     # Remove all sites in collection
     def admin_delete_sites(self):
@@ -166,42 +172,81 @@ class StackOverflow:
 
     # Get a list of top SO experts, get top reputation per site, store these
     # No paging needed, since we only get top 100 users
-    def admin_load_experts(self):
+    def admin_import_experts(self):
         so_params_dict = {}
         so_params_dict.update(self.so_params_dict)
         page = so_params_dict["page"] = 1
         pagesize = so_params_dict["pagesize"] = SO_NUM_TOP_EXPERTS
         list_experts_returned = []
-        num_loaded = 0
+        num_imported = 0
+
+        print(f"admin_import_experts num sites: {self.len_all_sites_list}")
 
         for site in self.all_sites_list:
             so_params_dict["site"] = site.site
+            print(f"{site.site}")
 
             r = self.s.get(self.so_api_url + self.so_url_users_reputation, params=so_params_dict,
                            headers=self._so_headers)
             if r.status_code != 200:
-                return {"error": r.status_code,
-                        "url": {"method": self.so_api_url + self.so_url_users_reputation, "params": so_params_dict}}
-            else:
-                return_dict = {}
-                r_json = r.json()
-                item_list = r_json["items"]
-                list_experts = []
-                for item in item_list:
-                    dict_expert = {"user_id": item["user_id"], "display_name": item["display_name"],
-                                   "link": item["link"], "site": site.site, "reputation": item["reputation"]}
-                    list_experts.append(db.Expert(self.firestore.dbcoll_experts, dict_expert))
-                    # "reputation_ratio": df_site_top100_users.loc[df_site_top100_users['name'] == item["display_name"], "reputation_ratio"].iloc[0]})
+                # Retry
+                print(f'Retrying on error {r.status_code}:{r.reason} for {site.site}')
+                # This may sleep for a mandatory backoff period, or a much longer period if 503
+                self.check_for_backoff(r)
 
-                results_batch_store = self.firestore.batch_store_experts(list_experts)
-                if results_batch_store["status"] == "OK":
-                    list_experts_returned.extend(list_experts)
-                    # print(f"batch_store_experts stored: {results_batch_store['count_stored']}")
-                    num_loaded = len(list_experts) + num_loaded
+                r = self.s.get(self.so_api_url + self.so_url_users_reputation, params=so_params_dict,
+                               headers=self._so_headers)
+                if r.status_code != 200:
+                    dict_error = {"error": r.status_code,
+                                  "url": {"method": self.so_api_url + self.so_url_users_reputation,
+                                          "params": so_params_dict}}
+                    if r.status_code < 500:
+                        dict_error["json"] = r.json()
+                    print(f"admin_import_experts: {json.dumps(dict_error)}")
+                    # Continue (log but ignore this failed http get from SO)
+                    continue
                 else:
-                    print(f"batch_store_experts failed: {results_batch_store['attempted_count']}")
+                    list_experts = self.import_experts_for_site(site, r.json())
+            else:
+                list_experts = self.import_experts_for_site(site, r.json())
 
-        return {"num_loaded": num_loaded, "list_sites": list_experts_returned}
+            list_experts_returned.extend(list_experts)
+            num_imported = num_imported + len(list_experts)
+            print(f"{num_imported} experts imported...")
+
+            # Sleep to back off hammering SO
+            self.check_for_backoff(r)
+
+        return {"num_imported": num_imported, "list_experts_returned": list_experts_returned}
+
+    @staticmethod
+    def check_for_backoff(r):
+        if r.status_code < 500:
+            r_json = r.json()  # json not found in 500 errors
+            if "backoff" in r_json:
+                secs = r_json["backoff"]
+                print(f"SO mandated throttle of {secs} seconds...")
+                time.sleep(secs)
+        # 503 error means the service is unavailable, so back off anyway, for couple minutes...
+        else:
+            print(f"SO site unavailable (503 error), so backing off "
+                  f"{SO_503_INTER_REQUEST_BACKOFF_SLEEP_SECONDS} seconds...")
+            time.sleep(SO_503_INTER_REQUEST_BACKOFF_SLEEP_SECONDS)
+
+    def import_experts_for_site(self, site, r_json):
+        return_dict = {}
+        item_list = r_json["items"]
+        list_experts = []
+        for item in item_list:
+            dict_expert = {"user_id": item["user_id"], "display_name": item["display_name"],
+                           "link": item["link"], "site": site.site, "reputation": item["reputation"]}
+            list_experts.append(db.Expert(self.firestore.dbcoll_experts, dict_expert))
+
+        results_batch_store = self.firestore.batch_store_experts(list_experts)
+        if results_batch_store["status"] != "OK":
+            print(f"num_imported failed: {results_batch_store['attempted_count']}")
+
+        return list_experts
 
     def get_top_users_reputation(self, site, page, pagesize=SO_NUM_TOP_EXPERTS):
         so_params_dict = {}

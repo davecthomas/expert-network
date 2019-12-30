@@ -1,11 +1,12 @@
 from app import app
-from app import stackoverflow
+# from app import stackoverflow
 from flask import current_app, render_template
 from flask_restful import reqparse
 from flask import jsonify
 import json
+import requests
 
-so = stackoverflow.StackOverflow()
+# so = stackoverflow.StackOverflow()
 parser = reqparse.RequestParser()
 
 
@@ -42,63 +43,63 @@ def sites():
 
     args = parser.parse_args()
 
-    return_dict = so.get_sites_by_page(get_page(args), get_pagesize(args))
+    return_dict = app.so.get_sites_by_page(get_page(args), get_pagesize(args))
     if "error" in return_dict:
         return render_template('error.html', error=return_dict["error"], url=return_dict["url"])
     else:
         return render_template('sites.html', title="Top Sites", return_dict=return_dict)
 
 
-@app.route('/admin/load_sites')
-def admin_load_sites():
-    dict_return = so.admin_load_sites(page=1)
-    message = {
-            'status': 200,
-            'message': 'OK',
-            'count_loaded_sites': dict_return["num_loaded"]
-    }
-    # Debug
-    # for site in dict_return["list_sites"]:
-    #     print(site.site)
-    resp = jsonify(message)
-    resp.status_code = 200
-
-    return resp
-
-
-@app.route('/admin/delete_sites')
-def admin_delete_sites():
-    message = {
-            'status': 200,
-            'message': 'OK',
-            'count_deleted_sites': so.admin_delete_sites()
-    }
-    resp = jsonify(message)
-    resp.status_code = 200
-
-    return resp
+# @app.route('/admin/load_sites')
+# def admin_load_sites():
+#     dict_return = app.so.admin_load_sites(page=1)
+#     message = {
+#             'status': 200,
+#             'message': 'OK',
+#             'count_loaded_sites': dict_return["num_loaded"]
+#     }
+#     # Debug
+#     # for site in dict_return["list_sites"]:
+#     #     print(site.site)
+#     resp = jsonify(message)
+#     resp.status_code = 200
+#
+#     return resp
 
 
-@app.route('/admin/load_experts')
-def admin_load_experts():
-    dict_return = so.admin_load_experts()
-    if "error" in dict_return:
-        message = {
-            'status': json.dumps(dict_return)
-        }
-    else:
-        message = {
-                'status': 200,
-                'message': 'OK',
-                'count_loaded_experts': dict_return["num_loaded"]
-        }
-    # Debug
-    # for site in dict_return["list_sites"]:
-    #     print(site.site)
-    resp = jsonify(message)
-    resp.status_code = 200
+# @app.route('/admin/delete_sites')
+# def admin_delete_sites():
+#     message = {
+#             'status': 200,
+#             'message': 'OK',
+#             'count_deleted_sites': app.so.admin_delete_sites()
+#     }
+#     resp = jsonify(message)
+#     resp.status_code = 200
+#
+#     return resp
 
-    return resp
+#
+# @app.route('/admin/load_experts')
+# def admin_load_experts():
+#     message = {
+#         'status': 200,
+#         'message': 'OK',
+#     }
+#     resp = jsonify(message)
+#     resp.status_code = 200
+#
+#     dict_return = app.so.admin_load_experts()
+#     if "error" in dict_return:
+#         message = {
+#             'status': json.dumps(dict_return)
+#         }
+#         resp.status_code = 200
+#
+#     else:
+#         message['count_loaded_experts': dict_return["num_loaded"]]
+#
+#     return resp
 
 
 @app.route('/users_rep')
@@ -119,7 +120,7 @@ def users_rep():
     else:
         site = args.site
 
-    return_dict = so.get_top_users_reputation(site, get_page(args), get_pagesize(args))
+    return_dict = app.so.get_top_users_reputation(site, get_page(args), get_pagesize(args))
     if "error" in return_dict:
         return render_template('error.html', error=return_dict["error"], url=return_dict["url"])
     else:
@@ -128,12 +129,12 @@ def users_rep():
 #
 # @app.route('/comments')
 # def comments():
-#     return so.get_comments()
+#     return app.so.get_comments()
 
 #
 # @app.route('/bigquery')
 # def bigquery():
-#     list_results = so.query_stackoverflow()
+#     list_results = app.so.query_stackoverflow()
 #     results_str = ""
 #     for row in list_results:
 #         result = "{} : {} views".format(row.url, row.view_count)
