@@ -26,19 +26,23 @@ class Firestore:
 
     # Store a batch of up to 500 sites (limited by Google Cloud Batch transaction limits)
     # This can be done repeatedly without concern, due to merge=True
-    def batchStoreSites(self, list_sites):
+    def batchStoreSites(self, list_sites, test=False):
         len_list = len(list_sites)
         count_stored = 0
         if len_list > GOOGLE_FIRESTORE_MAX_BATCH_SIZE:
             return {"status": "Failed", "attempted_count": len_list}
-
-        batch = self.db.batch()
+        if not test:
+            batch = self.db.batch()
         for site in list_sites:
-            batch.set(self.dbcoll_sites.document(site.site), site.to_dict(), merge=True)
+            if not test:
+                batch.set(self.dbcoll_sites.document(site.site), site.to_dict(), merge=True)
+            else:
+                print(f'Test commit of {site.to_dict()}')
             count_stored = count_stored + 1
 
         # Commit the batch
-        batch.commit()
+        if not test:
+            batch.commit()
 
         return {"status": "OK", "count_stored": count_stored}
 
@@ -105,6 +109,31 @@ class Firestore:
         batch = None
         return {"status": "OK", "count_stored": count_stored}
 
+    def get_experts_by_site(self, site_name):
+        site = self.dbcoll_sites.where(u'site', u'==', site_name).get()
+        print(f'List contains {len(site.expert_list)} experts')
+        for expert in site.expert_list:
+            print(u'{} => {}'.format(expert.expert_key, expert.to_dict()))
+        return site.expert_list
+
+    def get_site_from_name(self, site_name):
+        site_obj = None
+        sites = self.dbcoll_sites.where(u'site', u'==', site_name).get()
+        for site in sites:
+            site_obj = Site(self.dbcoll_sites, site.to_dict())
+            # print(f'{site_obj.to_dict()}')
+        return site_obj
+
+    def get_expert_from_id(self, user_id):
+        expert_obj = None
+        # print(f'ID: {user_id}')
+        experts = self.dbcoll_experts.where(u'user_id', u'==', user_id).get()
+        for expert in experts:
+            print(f'DB {expert.to_dict()}')
+            expert_obj = Expert(self.dbcoll_experts, expert.to_dict())
+            print(f'OBJ {expert_obj.to_dict()}')
+        return expert_obj
+
 
 class Site:
     # {"name": item["name"], "name_urlencoded": parse.quote(item["name"]),
@@ -112,6 +141,7 @@ class Site:
     def __init__(self, dbcoll_sites, dict_site):
         self.dict_site = dict_site
         self.dbcoll_sites = dbcoll_sites
+        self.timestamp = datetime.now()
 
         if "name" in dict_site:
             self.name = dict_site["name"]
@@ -129,17 +159,30 @@ class Site:
             self.link = dict_site["link"]
         else:
             self.link = None
+        if "expert_list" in dict_site:
+            self.expert_list = dict_site["expert_list"]
+        else:
+            self.expert_list = []
+            self.dict_site["expert_list"] = []
+
+    def add_expert_list(self, expert_list, test=False):
+        self.expert_list = expert_list
+        self.timestamp = datetime.now()
+        self.dbcoll_sites.document(self.site).update({u'expert_list': expert_list})
+        print(f'Adding {expert_list} to {self.name}')
 
     def to_dict(self):
-        return self.dict_site
+        return {"name": self.name, "name_urlencoded": self.name_urlencoded,
+                "site": self.site, "link": self.link, "expert_list": self.expert_list,
+                "timestamp": self.timestamp}
 
     def __repr__(self):
         return json.dumps(self.dict_site)
 
     # Non-batched write is currently unused
-    def write(self):
-        self.dict_site["timestamp"] = firestore.SERVER_TIMESTAMP
-        self.dbcoll_sites.document(self.site).set(self.dict_site, merge=True)
+    def update_firestore(self):
+        self.timestamp = datetime.now()
+        self.dbcoll_sites.document(self.site).set(self.to_dict(), merge=True)
 
 
 class Expert:
@@ -151,7 +194,6 @@ class Expert:
     def __init__(self, dbcoll_experts, dict_expert):
         self.dict_expert = dict_expert
         self.dbcoll_experts = dbcoll_experts
-        self.sites = {}
         self.total_reputation = 0
 
         if "expert_key" in dict_expert:
@@ -170,8 +212,18 @@ class Expert:
             self.link = dict_expert["link"]
         else:
             self.link = None
+        if "sites" in dict_expert:
+            self.sites = dict_expert["sites"]
+            # if isinstance(self.sites, dict):
+            #     for site_name, site_dict in self.sites.items():
+            #         if "reputation" in site_dict:
+            #             self.total_reputation = self.total_reputation + site_dict["reputation"]
+        else:
+            self.sites = {}
+        if "total_reputation" in dict_expert:
+            self.total_reputation = dict_expert["total_reputation"]
 
-        self.total_reputation = 0
+        self.timestamp = datetime.now()
 
     def add_site(self, dict_expert):
         if "site" in dict_expert:
@@ -184,6 +236,7 @@ class Expert:
                 self.sites[site_key]["reputation_ratio"] = dict_expert["reputation_ratio"]
             if "reputation_ratio_val" in dict_expert:
                 self.sites[site_key]["reputation_ratio_val"] = dict_expert["reputation_ratio_val"]
+            self.timestamp = datetime.now()
 
     @staticmethod
     def check_and_merge(dict_expert, dict_experts_returned, test=False):
@@ -208,18 +261,18 @@ class Expert:
                                 "reputation_ratio": site["reputation_ratio"]}
         to_dict = {"expert_key": self.expert_key, "user_id": self.user_id, "display_name": self.display_name,
                    "link": self.link,
-                   "total_reputation": self.total_reputation, "sites": sites}
+                   "total_reputation": self.total_reputation, "sites": sites, "timestamp": self.timestamp}
         # print(f'to_dict: {to_dict}')
         return to_dict
 
     def __repr__(self):
         return json.dumps({"expert_key": self.expert_key, "user_id": self.user_id, "display_name": self.display_name,
                            "link": self.link,
-                           "total_reputation": self.total_reputation, "sites": self.sites})
+                           "total_reputation": self.total_reputation, "sites": self.sites, "timestamp": self.timestamp})
 
     # Non-batched write
     def update_firestore(self, test=False):
-        self.dict_expert["timestamp"] = firestore.SERVER_TIMESTAMP
+        self.timestamp = datetime.now()
         to_dict = self.to_dict()
         if not test:
             self.dbcoll_experts.document(self.expert_key).set(self.to_dict(), merge=True)
