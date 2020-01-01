@@ -26,3 +26,12 @@ Launch by a command:
 flask run
 ```
 The daemon should start and you can access it's web interface at 127.0.0.1 
+
+## Admin tasks
+```
+flask admin import_sites
+flask admin import_experts
+```
+
+## Avoid Google Cloud costs in test mode
+To prevent document writes or deletes...

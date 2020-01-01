@@ -18,7 +18,7 @@ def admin_import_experts():
         'message': 'OK'
     }
 
-    dict_return = so.admin_import_experts()
+    dict_return = so.admin_import_experts(test=False)
     if "error" in dict_return:
         message["message"] = json.dumps(dict_return)
 

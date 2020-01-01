@@ -7,7 +7,9 @@ import pandas as pd
 from requests.adapters import HTTPAdapter
 
 from app import db
+
 import time
+import copy
 
 SO_DEFAULT_PAGESIZE = int(15)
 # This MAX is technically unbounded, but I want to page at this size due to batch limits in Google Cloud Firestore
@@ -135,7 +137,7 @@ class StackOverflow:
 
     # Get a list of top SO experts, get top reputation per site, store these
     # No paging needed, since we only get top 100 users
-    def admin_import_experts(self):
+    def admin_import_experts(self, test=False):
         so_params_dict = {}
         so_params_dict.update(self.so_params_dict)
         page = so_params_dict["page"] = 1
@@ -147,7 +149,7 @@ class StackOverflow:
 
         for site in self.all_sites_list:
             so_params_dict["site"] = site.site
-            print(f"{site.site}")
+            # print(f"{site.site}")
 
             r = self.s.get(self.so_api_url + self.so_url_users_reputation, params=so_params_dict,
                            headers=self._so_headers)
@@ -169,9 +171,10 @@ class StackOverflow:
                     # Continue (log but ignore this failed http get from SO)
                     continue
                 else:
-                    dict_experts = self.import_experts_for_site(site, r.json())
+                    dict_experts = self.import_experts_for_site(dict_experts_returned, site, r.json(), test)
+
             else:
-                dict_experts = self.import_experts_for_site(site, r.json())
+                dict_experts = self.import_experts_for_site(dict_experts_returned, site, r.json(), test)
 
             dict_experts_returned = self.merge_experts(dict_experts, dict_experts_returned)
 
@@ -180,8 +183,6 @@ class StackOverflow:
 
             # Sleep to back off hammering SO
             self.check_for_backoff(r)
-
-        # Curious: get the expert with the most sites
 
         return {"num_imported": num_imported, "dict_experts_returned": dict_experts_returned}
 
@@ -199,7 +200,7 @@ class StackOverflow:
                   f"{SO_503_INTER_REQUEST_BACKOFF_SLEEP_SECONDS} seconds...")
             time.sleep(SO_503_INTER_REQUEST_BACKOFF_SLEEP_SECONDS)
 
-    def import_experts_for_site(self, site, r_json):
+    def import_experts_for_site(self, dict_experts_returned, site, r_json, test=False):
         return_dict = {}
         item_list = r_json["items"]
         dict_experts = {}
@@ -208,14 +209,33 @@ class StackOverflow:
         df_list = df_list[df_list_columns]
         df_list["site"] = site.site
         all_rep_sum = df_list["reputation"].sum()
+        df_list["expert_key"] = df_list["user_id"]
+        df_list["expert_key"] = df_list["expert_key"].apply(str)
         df_list["reputation_ratio"] = df_list["reputation"] / all_rep_sum
+        df_list["reputation_ratio_val"] = df_list["reputation_ratio"]
         df_list['reputation_ratio'] = df_list['reputation_ratio'].astype(float).map("{:.2%}".format)
-        # df_item_list = df_list.to_dict(orient='records')
-        for i, dict_expert in df_list.iterrows():
-            expert = db.Expert(self.firestore.dbcoll_experts, dict_expert)
-            dict_experts[expert.user_id] = expert
+        list_expert_keys_to_delete = []
 
-        results_batch_store = self.firestore.batch_store_experts(dict_experts)
+        for i, dict_expert in df_list.iterrows():
+            # Rather than adding a new one, this will update the expert in dict_experts_returned,
+            # if the expert in dict_expert is found there. This is crucial, otherwise the last site where the expert is
+            # found will overwrite the total_reputation of the expert.
+            if db.Expert.check_and_merge(dict_expert, dict_experts_returned, test) is False:
+                expert = db.Expert(self.firestore.dbcoll_experts, dict_expert)
+                expert.add_site(dict_expert)
+                dict_experts[expert.expert_key] = expert
+            # else:
+                # Create a list of keys to delete, so we don't have duplicates when we append this site expert
+                # dict to the master dict of all sites' experts
+                # list_expert_keys_to_delete.append(dict_expert["expert_key"])
+                # print(f'Skipped adding {dict_expert["expert_key"]} from site {dict_expert["site"]} since we have it in {dict_experts_returned["expert_key"]}')
+
+        # for expert_key in list_expert_keys_to_delete:
+        #     if expert_key in dict_experts
+        #     print(f'Removing duplicate expert {expert_key}')
+        #     del dict_experts[expert_key]
+
+        results_batch_store = self.firestore.batch_store_experts(dict_experts, test)
         if results_batch_store["status"] != "OK":
             print(f"num_imported failed: {results_batch_store['attempted_count']}")
         # else:
@@ -225,19 +245,19 @@ class StackOverflow:
     # If the expert in the first dict is found in the second dict, update the expert
     # Merge the first dict into the second, after you delete any duplicates
     def merge_experts(self, dict_experts, dict_experts_returned):
-        list_keys_to_delete = []
-        for user_id, expert in dict_experts.items():
-            if user_id in dict_experts_returned:
-                site_to_add = next(iter(expert.sites))
-                expert_master = dict_experts_returned[user_id]
-                # print(f'Found same user {user_id} from site {site_to_add} in site {expert_master.sites}')
-                # This should add another site record to their reputation, total reputation increments
-                expert_master.add_site(expert, site_to_add)
-                # print(f"After merge: {expert_master}")
-                list_keys_to_delete.append(user_id)
-
-        for key in list_keys_to_delete:
-            del dict_experts[key]
+        # list_keys_to_delete = []
+        # for expert_key, expert in dict_experts.items():
+        #     if expert_key in dict_experts_returned:
+        #         site_to_add = next(iter(expert.sites))
+        #         expert_master = dict_experts_returned[expert_key]
+        #         print(f'Found same user {expert_key} from site {site_to_add} in site {expert_master.sites}')
+        #         # This should add another site record to their reputation, total reputation increments
+        #         expert_master.add_site(expert, site_to_add)
+        #         print(f"After merge: {expert_master}")
+        #         list_keys_to_delete.append(expert_key)
+        #
+        # for key in list_keys_to_delete:
+        #     del dict_experts[key]
 
         dict_experts_returned.update(dict_experts)
         return dict_experts_returned
