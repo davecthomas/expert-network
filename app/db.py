@@ -129,9 +129,9 @@ class Firestore:
         # print(f'ID: {user_id}')
         experts = self.dbcoll_experts.where(u'user_id', u'==', user_id).get()
         for expert in experts:
-            print(f'DB {expert.to_dict()}')
+            # print(f'DB {expert.to_dict()}')
             expert_obj = Expert(self.dbcoll_experts, expert.to_dict())
-            print(f'OBJ {expert_obj.to_dict()}')
+            # print(f'OBJ {expert_obj.to_dict()}')
         return expert_obj
 
 

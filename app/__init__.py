@@ -87,33 +87,26 @@ def users_rep():
                 if expert is not None:
                     list_expert_objects.append(expert)
                     dict_experts[expert.expert_key] = expert.to_dict()
-        print(f'Site: {site_obj.to_dict()}')
+        # print(f'Site: {site_obj.to_dict()}')
         dict_site_experts = {
+            "site_site": site,
             "site": site_obj.to_dict(),
             "list_experts": list_experts,
-            "dict_experts": dict_experts
+            "dict_experts": dict_experts,
+            "page": get_page(args),
+            "pagesize": get_pagesize(args),
+            "has_more": False
         }
         message = {
             'status': 200,
             'message': 'OK',
             'dict_site_experts': dict_site_experts
         }
-        resp = jsonify(message)
-        resp.status_code = 200
+
+    if "error" in message:
+        return render_template('error.html', error=message["message"], url="")
     else:
-        message = {
-            'status': 500,
-            'message': 'Site not found: ' + site
-        }
-        resp = jsonify(message)
-        resp.status_code = 500
-
-    return resp
-
-    # if "error" in return_dict:
-    #     return render_template('error.html', error=return_dict["error"], url=return_dict["url"])
-    # else:
-    # return render_template('top_rep.html', title="Top Experts", name=name, site=site, return_dict=return_dict)
+        return render_template('top_rep.html', title="Top Experts", name=site_obj.name, site=site_obj, dict_site_experts=dict_site_experts)
 
 
 @app.cli.command('import_experts')

@@ -20,22 +20,45 @@
   {% endif %}
 <h1>Expert Network - <a href="sites">Stack Exchange</a> {{title}} at {{name|safe}}</h1>
 <div class="container-fluid">
-    {% if return_dict is defined and "items" in return_dict%}
+    {% if dict_site_experts is defined and "dict_experts" in dict_site_experts%}
+      {% if "site" in dict_site_experts %}
+        {% set site_dict = dict_site_experts["site"] %}
+        {% if "site" in site_dict %}
+          {% set site_name = site_dict["site"] %}
+        {% else %}
+          {% set site_name = "" %}
+        {% endif %}
+      {% else %}
+        {% set site_dict = {} %}
+      {% endif %}
+      {% if "dict_experts" in dict_site_experts %}
+        {% set dict_experts = dict_site_experts["dict_experts"] %}
+      {% else %}
+        {% set dict_experts = {} %}
+      {% endif %}
   <table class="table table-hover">
   <thead>
     <tr class="d-flex">
       <th class="col-sm-1" scope="col">Rank</th>
       <th class="col-sm-4" scope="col">Expert</th>
-      <th class="col-sm-7" scope="col">Reputation</th>
+      <th class="col-sm-4" scope="col">Site Reputation (Total Reputation)</th>
+      <th class="col-sm-3" scope="col">Reputation as a ratio of top experts</th>
     </tr>
   </thead>
   <tbody>
       {% set inc=1 %}
-      {% for expert in return_dict["items"] %}
+      {% for expert_key, expert_dict in dict_experts.items() %}
+        {% set sites_dict = expert_dict["sites"] %}
+
       <tr class="d-flex">
       <td class="col-sm-1" scope="row">{{loop.index + ((page-1)*pagesize)}}</td>
-      <td class="col-sm-4"><a href="{{expert["link"]}}">{{expert["name"]|safe}}</a></td>
-      <td class="col-sm-7"><a href="user_tags/{{expert["site"]}}">{{expert["reputation"]}}</a></td>
+      <td class="col-sm-4"><a href="{{expert_dict["link"]}}">{{expert_dict["display_name"]|safe}}</a></td>
+        {% if site_name in sites_dict %}
+          {% set site_rep = sites_dict[site_name]["reputation"] %}
+          {% set site_rep_ratio = sites_dict[site_name]["reputation_ratio"] %}
+      <td class="col-sm-4">{{site_rep|safe}} ({{expert_dict["total_reputation"]}})</td>
+      <td class="col-sm-3">{{site_rep_ratio|safe}}</td>
+        {% endif %}
       </tr>
       {% endfor %}
   </tbody>
@@ -51,7 +74,7 @@
       </span>
     </li>
     {% if "has_more" in return_dict%}
-    <li class="page-item {% if return_dict["has_more"] == False %} disabled{% endif %}">
+    <li class="page-item {% if dict_site_experts["has_more"] == False %} disabled{% endif %}">
       <span class="page-link">
         <a class="page-link" href="users_rep?page={{page+1}}&pagesize={{pagesize}}&site={{site}}">Next</a>
       </span>
@@ -69,7 +92,7 @@
 </p>
 <div class="collapse" id="collapseExample">
   <div class="card card-body">
-    {{return_dict}}
+    {{dict_site_experts}}
   </div>
 </div>
 </row>
